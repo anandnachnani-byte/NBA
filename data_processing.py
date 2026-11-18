@@ -366,8 +366,12 @@ def build_game_minutes(pbp, prices, max_gap='3min'):
     """
     Lines up one game's cleaned play-by-play and home-team price series
     on real-world time. Builds a one-minute grid from the first to the
-    last play, takes the latest game state at or before each minute,
-    and takes the latest price no older than max_gap (otherwise NaN).
+    last play and takes the latest game state at or before each minute.
+    Polymarket's minute prints arrive a few seconds after the minute
+    (median about 6 s), so each print is assigned to the minute it
+    falls in; taking the latest print before the minute instead would
+    pair each game state with a price almost a minute old. A minute
+    with no print reuses the last one, up to max_gap, otherwise NaN.
     Returns columns minute_ts, period, sec_remaining, elapsed, margin,
     price_home and logit_price.
     """
@@ -383,6 +387,8 @@ def build_game_minutes(pbp, prices, max_gap='3min'):
                         direction='backward').drop(columns='ts')
     out = out.dropna(subset=['period'])
     price = prices[['ts', 'price']].rename(columns={'price': 'price_home'})
+    price = price.assign(ts=price['ts'].dt.floor('min'))
+    price = price.groupby('ts', as_index=False).last()
     out = pd.merge_asof(out, price, left_on='minute_ts', right_on='ts',
                         direction='backward',
                         tolerance=pd.Timedelta(max_gap)).drop(columns='ts')

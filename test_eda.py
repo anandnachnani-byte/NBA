@@ -182,11 +182,17 @@ def fake_prices():
 
 
 def test_build_game_minutes():
-    """Prices and scores line up minute by minute; stale prices drop."""
+    """
+    Prices and scores line up minute by minute. A print a few seconds
+    after a minute (00:02:10) belongs to that minute, not the next one,
+    and prices older than three minutes drop.
+    """
     pbp = dp.clean_pbp(load_fixture('fake_pbp.csv'))
     minutes = dp.build_game_minutes(pbp, fake_prices())
     by_min = minutes.set_index(minutes['minute_ts'].dt.strftime('%H:%M'))
-    assert by_min.loc['00:02', 'price_home'] == 0.5
+    assert by_min.loc['00:00', 'price_home'] == 0.5
+    assert by_min.loc['00:01', 'price_home'] == 0.5
+    assert by_min.loc['00:02', 'price_home'] == 0.7
     assert by_min.loc['00:03', 'price_home'] == 0.7
     assert by_min.loc['00:03', 'margin'] == 9
     assert by_min.loc['00:05', 'price_home'] == 0.7
