@@ -108,9 +108,12 @@ def build_tables(data):
         game_runs = dp.detect_runs(pbp)
         game_runs['game_id'] = game_id
         game_runs['pregame_price'] = pre
-        runs.append(game_runs)
+        if len(game_runs):
+            runs.append(game_runs)
+        moved = game_min['price_home'].diff().fillna(0) != 0
         info.update({'tip_ts': tip, 'pregame_price': pre,
                      'n_minutes': len(game_min),
+                     'moved_share': float(moved.mean()),
                      'n_minutes_priced': int(
                          game_min['price_home'].notna().sum()),
                      'n_runs': len(game_runs)})
@@ -324,6 +327,7 @@ def summaries(tables):
         'D pregame_price (home)': joined['pregame_price'],
         'D price points per game': joined['n_price_points'],
         'D priced_share of minutes': joined['priced_share'],
+        'D moved_share of minutes': joined['moved_share'],
         'D runs per game': joined['n_runs'],
         'E logit_price': minutes['logit_price'],
         'E margin_scaled': minutes['margin_scaled'],
@@ -371,13 +375,14 @@ def save_fig(fig, name):
 def plot_markets(tables):
     """Figure 1: market volume distribution and markets per month."""
     markets = tables['markets']
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.0))
     vol = np.log10(markets['market_volume'].clip(lower=1))
     ax1.hist(vol, bins=40, color='#2a6fdb', alpha=0.85)
     cuts = np.log10(tables['joined']['volume'].quantile([1 / 3, 2 / 3]))
-    for cut, label in zip(cuts, ('low/mid', 'mid/high')):
-        ax1.axvline(cut, color='black', ls='--', lw=1)
-        ax1.text(cut, ax1.get_ylim()[1] * 0.92, ' ' + label, fontsize=8)
+    for i, cut in enumerate(cuts):
+        ax1.axvline(cut, color='black', ls='--', lw=1,
+                    label='Volume tercile cut-offs' if i == 0 else None)
+    ax1.legend(fontsize=8, loc='upper left')
     ax1.set(title='(a) Moneyline volume per game',
             xlabel='log10(volume in USD)', ylabel='Number of markets')
     month = markets['slug_date'].str[:7].value_counts().sort_index()
@@ -390,7 +395,7 @@ def plot_markets(tables):
 
 def plot_prices(tables, example_game):
     """Figure 2: one game's price path and minute log-odds changes."""
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.0))
     game = tables['minutes'][tables['minutes']['game_id'] == example_game]
     info = tables['joined'].set_index('game_id').loc[example_game]
     ax1.plot(game['minute_ts'], game['price_home'], color='black', lw=1.2,
@@ -431,7 +436,7 @@ def plot_prices(tables, example_game):
 def plot_pbp(tables):
     """Figure 3: runs per period by side and margin by period."""
     runs = tables['runs']
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.0))
     counts = runs.groupby(['quarter', 'team']).size().unstack(fill_value=0)
     counts = counts.reindex([q for q in ['Q1', 'Q2', 'Q3', 'Q4', 'OT']
                              if q in counts.index])
@@ -455,7 +460,7 @@ def plot_pbp(tables):
 def plot_joined(tables):
     """Figure 4: pregame price by result and price coverage per game."""
     joined = tables['joined'].dropna(subset=['pregame_price'])
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.0))
     bins = np.linspace(0, 1, 21)
     for win, color, label in ((1, '#2a6fdb', 'Home team won'),
                               (0, '#e07b39', 'Home team lost')):
@@ -464,18 +469,22 @@ def plot_joined(tables):
     ax1.set(title='(a) Pregame home win probability by result',
             xlabel='Polymarket price at tip-off', ylabel='Number of games')
     ax1.legend(fontsize=8)
-    ax2.hist(100 * tables['joined']['priced_share'].dropna(), bins=30,
-             color='#2a6fdb')
-    ax2.set(title='(b) Share of game minutes with a fresh price',
-            xlabel='Percent of minutes (price no older than 3 min)',
-            ylabel='Number of games')
+    moved = tables['joined'].dropna(subset=['moved_share',
+                                            'volume_tercile']).copy()
+    moved['pct_moved'] = 100 * moved['moved_share']
+    sns.boxplot(data=moved, x='volume_tercile', y='pct_moved', ax=ax2,
+                color='#9ec1f5', fliersize=2,
+                order=['low', 'mid', 'high'])
+    ax2.set(title='(b) How often the price moves, by volume',
+            xlabel='Market volume tercile',
+            ylabel='Percent of game minutes with a price change')
     save_fig(fig, 'fig4_joined')
 
 
 def plot_minutes(tables):
     """Figure 5: price vs margin by quarter and calibration curves."""
     minutes = tables['minutes'].dropna(subset=['price_home'])
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.0))
     reg = minutes[minutes['period'] <= 4]
     reg = reg[reg['margin'].between(-25, 25)]
     means = reg.groupby(['period', 'margin'])['price_home'].mean()
@@ -513,7 +522,7 @@ def plot_validity(tables, study, placebo):
     """
     runs = tables['runs'].dropna(subset=['market_reaction',
                                          'fair_reaction'])
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.8))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 3.1))
     sns.scatterplot(data=runs, x='fair_reaction', y='market_reaction',
                     hue='runner_role', palette=FAV_COLORS, s=10,
                     alpha=0.5, ax=ax1, edgecolor=None)
@@ -571,6 +580,53 @@ def context_table(runs):
     return pd.DataFrame(rows)
 
 
+def write_markdown_tables(tables, quant, cats, miss):
+    """
+    Writes the summary tables as Markdown files in results/ so the
+    report (built by build_report.sh) always shows the current numbers.
+    """
+    sizes = pd.DataFrame([
+        {'Table': name, 'Rows': f'{tables[name].shape[0]:,}',
+         'Columns': tables[name].shape[1]}
+        for name in ('markets', 'prices', 'pbp', 'joined', 'minutes',
+                     'runs')])
+    labels = {'markets': 'A (markets)', 'prices': 'B (prices)',
+              'pbp': 'C (play-by-play)', 'joined': 'D (markets x games)',
+              'minutes': 'E (game-minutes)', 'runs': 'runs'}
+    sizes_text = '; '.join(
+        f'{labels[name]} {tables[name].shape[0]:,} rows x '
+        f'{tables[name].shape[1]} columns' for name in labels)
+    with open(os.path.join(RES_DIR, 'table_sizes_text.md'), 'w') as f:
+        f.write(sizes_text + '.\n')
+    short = {'A market_volume (USD)': 'volume, USD (A)',
+             'B d_logit per minute': 'd_logit/min (B)',
+             'C margin (home - away)': 'margin (C)',
+             'C sec_remaining': 'sec_remaining (C)',
+             'D pregame_price (home)': 'pregame_price (D)',
+             'D moved_share of minutes': 'moved_share (D)',
+             'D runs per game': 'runs per game (D)',
+             'runs run_pts': 'run_pts',
+             'runs market_reaction': 'market_reaction',
+             'runs fair_reaction': 'fair_reaction',
+             'runs drift': 'drift', 'runs fade_return': 'fade_return'}
+    q = quant.loc[list(short)].rename(index=short)
+    for col in q.columns[1:]:
+        q[col] = q[col].map(lambda v: f'{v:,.3g}' if abs(v) < 1000
+                            else f'{v:,.0f}')
+    q['n'] = q['n'].map(lambda v: f'{v:,}')
+    gaps = miss[miss['missing'] > 0].copy()
+    gaps['pct_missing'] = gaps['pct_missing'].round(1)
+    gaps = gaps[['table', 'column', 'missing', 'pct_missing']]
+    cat_short = cats[cats['table'].isin(['runs', 'unmatched', 'D'])]
+    for name, df, index in (('sizes', sizes, False), ('quant', q, True),
+                            ('missing', gaps, False),
+                            ('cats_short', cat_short, False),
+                            ('cats_all', cats, False)):
+        with open(os.path.join(RES_DIR, f'table_{name}.md'), 'w') as f:
+            f.write(df.to_markdown(index=index))
+            f.write('\n')
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument('--data', default=os.path.join('data', 'raw'))
@@ -599,6 +655,7 @@ def main():
     quant.to_csv(os.path.join(RES_DIR, 'quantitative_summary.csv'))
     cats.to_csv(os.path.join(RES_DIR, 'categorical_counts.csv'),
                 index=False)
+    write_markdown_tables(tables, quant, cats, miss)
     print('\n=== Seven-number summaries ===')
     print(quant.round(3).to_string())
     context = context_table(tables['runs'])

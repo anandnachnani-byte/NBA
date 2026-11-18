@@ -1,0 +1,23 @@
+| table   | column           |   missing |   pct_missing |
+|:--------|:-----------------|----------:|--------------:|
+| markets | market_volume    |       162 |           9.6 |
+| markets | event_volume     |        46 |           2.7 |
+| prices  | d_logit          |      1514 |           0.3 |
+| pbp     | teamTricode      |      5540 |           1.6 |
+| joined  | market_volume    |       161 |          10.6 |
+| joined  | event_volume     |        46 |           3   |
+| joined  | tip_ts           |       908 |          59.9 |
+| joined  | pregame_price    |       908 |          59.9 |
+| joined  | n_minutes        |       908 |          59.9 |
+| joined  | moved_share      |       908 |          59.9 |
+| joined  | n_minutes_priced |       908 |          59.9 |
+| joined  | n_runs           |       908 |          59.9 |
+| joined  | volume           |        46 |           3   |
+| joined  | priced_share     |       908 |          59.9 |
+| joined  | volume_tercile   |        46 |           3   |
+| minutes | price_home       |      1381 |           1.6 |
+| minutes | logit_price      |      1381 |           1.6 |
+| runs    | market_reaction  |        57 |           2.6 |
+| runs    | fair_reaction    |        55 |           2.5 |
+| runs    | drift            |       113 |           5.1 |
+| runs    | fade_return      |       113 |           5.1 |

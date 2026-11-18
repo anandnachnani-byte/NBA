@@ -39,6 +39,10 @@ LAST_DATE = '2026-11-17'
 # One known game per season; their 'series' ids give the NBA catalogs.
 SEED_SLUGS = ['nba-gsw-lal-2025-10-21', 'nba-nyk-tor-2026-11-17']
 MIN_PRICE_POINTS = 60
+# The NBA CDN blocks fast clients, so play-by-play is fetched slowly and
+# the run stops after a streak of failures instead of hammering it.
+PBP_PAUSE = 1.5
+MAX_PBP_FAILURES = 5
 PBP_COLUMNS = ['actionNumber', 'clock', 'timeActual', 'period',
                'actionType', 'subType', 'teamTricode', 'scoreHome',
                'scoreAway', 'description', 'orderNumber']
@@ -217,7 +221,7 @@ def fetch_pbp(game_id):
     keep = [c for c in PBP_COLUMNS if c in df.columns]
     df = df[keep].astype({'scoreHome': str, 'scoreAway': str})
     df.to_parquet(path, index=False)
-    time.sleep(0.3)
+    time.sleep(PBP_PAUSE)
 
 
 def make_sample(n_games):
@@ -261,16 +265,28 @@ def main():
     print(f'  {len(markets)} moneyline markets')
     matched = match(markets, games)
     todo = matched if args.limit is None else matched.head(args.limit)
+    pbp_failures = 0
     for i, row in enumerate(todo.to_dict('records')):
-        for kind, func, arg in (('prices', fetch_prices, row),
-                                ('pbp', fetch_pbp, row['game_id'])):
+        jobs = [('prices', fetch_prices, row)]
+        if pbp_failures < MAX_PBP_FAILURES:
+            jobs.append(('pbp', fetch_pbp, row['game_id']))
+        for kind, func, arg in jobs:
             try:
                 func(arg)
+                if kind == 'pbp':
+                    pbp_failures = 0
             except Exception as error:  # keep going; logged for review
                 log_failure(kind, row['game_id'], error)
+                if kind == 'pbp':
+                    pbp_failures += 1
+                    if pbp_failures == MAX_PBP_FAILURES:
+                        print('  NBA feed refusing requests; stopping '
+                              'play-by-play for this run (re-run later)')
         if (i + 1) % 50 == 0:
             print(f'  {i + 1}/{len(todo)} games fetched', flush=True)
-    print('done')
+    missing = sum(not os.path.exists(os.path.join(RAW, 'pbp', g + '.parquet'))
+                  for g in todo['game_id'])
+    print(f'done ({missing} games still missing play-by-play)')
 
 
 if __name__ == '__main__':

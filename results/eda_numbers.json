@@ -1,0 +1,33 @@
+{
+  "n_gamma_markets": 1682,
+  "n_nba_games": 1525,
+  "n_matched": 1515,
+  "n_unmatched": 167,
+  "n_games_with_prices": 1514,
+  "n_games_with_pbp": 607,
+  "n_games_sparse_prices": 1,
+  "n_games_used": 607,
+  "n_minutes": 87035,
+  "pct_minutes_priced": 98.41328201298329,
+  "n_runs": 2202,
+  "n_runs_with_reaction": 2145,
+  "n_games_with_runs": 597,
+  "ols_slope_all": 0.7730929966158192,
+  "mean_drift_runs": 0.01443393125702469,
+  "mean_drift_placebo": -0.016093019773602266,
+  "n_placebo": 1813,
+  "mean_fade_return": -0.016323460224798914,
+  "kurtosis_d_logit": 121.64598117536248,
+  "brier": {
+    "model": 0.1515230983922682,
+    "market": 0.1498746785386732,
+    "n_test_minutes": 16355,
+    "n_test_games": 116
+  },
+  "wp_params": {
+    "const": 0.0639,
+    "margin": -0.047,
+    "margin_scaled": 5.5932,
+    "pregame_logit": 0.6386
+  }
+}

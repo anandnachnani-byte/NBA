@@ -1,0 +1,1 @@
+A (markets) 1,682 rows x 14 columns; B (prices) 433,116 rows x 5 columns; C (play-by-play) 354,112 rows x 16 columns; D (markets x games) 1,515 rows x 34 columns; E (game-minutes) 87,035 rows x 14 columns; runs 2,202 rows x 19 columns.

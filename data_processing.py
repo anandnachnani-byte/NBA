@@ -382,7 +382,7 @@ def build_game_minutes(pbp, prices, max_gap='3min'):
     out = pd.merge_asof(grid, state, left_on='minute_ts', right_on='ts',
                         direction='backward').drop(columns='ts')
     out = out.dropna(subset=['period'])
-    price = prices.rename(columns={'price': 'price_home'})
+    price = prices[['ts', 'price']].rename(columns={'price': 'price_home'})
     out = pd.merge_asof(out, price, left_on='minute_ts', right_on='ts',
                         direction='backward',
                         tolerance=pd.Timedelta(max_gap)).drop(columns='ts')
